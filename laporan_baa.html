@@ -376,51 +376,77 @@
     }
 
     function renderLaporan(data) {
-      const wrap = document.getElementById('laporan-list');
-      const filtered = currentFilter === 'ALL' ? data : data.filter(i => i.category === currentFilter);
+        const wrap = document.getElementById('laporan-list');
+        const filtered = currentFilter === 'ALL' ? data : data.filter(i => i.category === currentFilter);
 
-      if (filtered.length === 0) {
-        wrap.innerHTML = '<p style="text-align:center; color:#aaa;">Data tidak ditemukan.</p>';
-        return;
-      }
-
-      wrap.innerHTML = filtered.map(i => {
-        const status = (i.status || 'pending').toLowerCase();
-        let sClass = 'tag-pending';
-        if (status === 'approved' || status === 'disetujui') sClass = 'tag-approved';
-        if (status === 'rejected' || status === 'ditolak') sClass = 'tag-rejected';
-
-        const displayOrg = i.organization || i.himpunan || "HMIF (Himpunan Teknik Informatika)";
-
-        // LOGIKA DETAIL KHUSUS
-        let specialDetail = "";
-        if (i.category === 'RUANGAN') {
-          specialDetail = `<div class="detail-box"><div class="detail-text"><i class="material-icons">meeting_room</i> Lokasi: ${i.roomName || 'Ruang Aula'}</div></div>`;
-        } else if (i.category === 'PERALATAN') {
-          specialDetail = `<div class="detail-box"><div class="detail-text"><i class="material-icons">inventory_2</i> Jumlah: ${i.amount || '1'} Unit</div></div>`;
-        } else if (i.category === 'DISPENSASI') {
-          specialDetail = `
-            <div class="detail-box">
-              <div class="detail-text"><i class="material-icons">menu_book</i> Matkul: ${i.subject || 'Pemrograman Web'}</div>
-              <div class="detail-text" style="font-size:11px; color:#666;"><i class="material-icons">person</i> Dosen: ${i.lecturer || 'Bpk. Ahmad Suherman'}</div>
-            </div>`;
+        if (filtered.length === 0) {
+          wrap.innerHTML = '<p style="text-align:center; color:#aaa;">Data tidak ditemukan.</p>';
+          return;
         }
 
-        return `
-          <div class="archive-card">
-            <span class="org-name">${displayOrg}</span>
-            <h4 class="item-title">${i.title || i.namaKegiatan || 'Tanpa Judul'}</h4>
-            <span class="status-tag ${sClass}">${status.toUpperCase()}</span>
-            
-            ${specialDetail}
+        wrap.innerHTML = filtered.map(i => {
+          // 1. Logika Status
+          const status = (i.status || 'pending').toLowerCase();
+          let sClass = 'tag-pending';
+          if (status === 'approved' || status === 'disetujui') sClass = 'tag-approved';
+          if (status === 'rejected' || status === 'ditolak') sClass = 'tag-rejected';
 
-            <div class="item-detail"><i class="material-icons">event</i> ${i.date || '-'}</div>
-            <div class="item-detail"><i class="material-icons">schedule</i> ${i.timeStart || '08:00'} - ${i.timeEnd || 'Selesai'}</div>
-            <div class="item-detail"><i class="material-icons">label</i> Kategori: ${i.category}</div>
-          </div>
-        `;
-      }).join('');
-    }
+          // 2. Logika Identitas & Waktu (Sesuai Pengajuan)
+          const displayOrg = i.organization || i.himpunan || "HMIF";
+          const jamMulai = i.start || i.timeStart || '08:00';
+          const jamSelesai = i.end || i.timeEnd || '--:--';
+
+          // 3. Logika Detail Spesifik Kategori
+          let specialDetail = "";
+
+          if (i.category === 'RUANGAN') {
+            let namaRuangRaw = i.room || i.roomName || '-';
+            let namaRuangTampil = "";
+            switch (namaRuangRaw) {
+              case 'ruang_a': namaRuangTampil = "Ruangan 111"; break;
+              case 'ruang_b': namaRuangTampil = "Ruangan 112"; break;
+              case 'ruang_c': namaRuangTampil = "Ruangan 113"; break;
+              case 'gsg': namaRuangTampil = "Ruangan GSG"; break;
+              default: namaRuangTampil = namaRuangRaw;
+            }
+            specialDetail = `<div class="detail-box"><div class="detail-text"><i class="material-icons">meeting_room</i> Ruangan: ${namaRuangTampil}</div></div>`;
+          }
+
+          else if (i.category === 'PERALATAN') {
+            // Mengambil nama alat dan jumlah dari database pengajuan
+            const namaAlat = i.equipmentName || i.title || 'Alat';
+            const jumlahAlat = i.amount || i.quantity || '1';
+            specialDetail = `<div class="detail-box"><div class="detail-text"><i class="material-icons">inventory_2</i> Peralatan: ${namaAlat} (${jumlahAlat} Unit)</div></div>`;
+          }
+
+          else if (i.category === 'DISPENSASI') {
+            // MENGAMBIL DATA LANGSUNG DARI PENGAJUAN SURAT DISPENSASI
+            const matkul = i.subject || i.mataKuliah || i.namaMatkul || '-';
+            const dosen = i.lecturer || i.namaDosen || i.dosenPengampu || '-';
+
+            specialDetail = `
+        <div class="detail-box">
+          <div class="detail-text"><i class="material-icons">menu_book</i> Matkul: ${matkul}</div>
+          <div class="detail-text" style="font-size:11px; color:#666; margin-top:4px;"><i class="material-icons">person</i> Dosen: ${dosen}</div>
+        </div>`;
+          }
+
+          // 4. Card Laporan
+          return `
+      <div class="archive-card">
+        <span class="org-name">${displayOrg}</span>
+        <h4 class="item-title">${i.title || i.namaKegiatan || 'Tanpa Judul'}</h4>
+        <span class="status-tag ${sClass}">${status.toUpperCase()}</span>
+        
+        ${specialDetail}
+
+        <div class="item-detail"><i class="material-icons">event</i> ${i.date || '-'}</div>
+        <div class="item-detail"><i class="material-icons">schedule</i> ${jamMulai} - ${jamSelesai}</div>
+        <div class="item-detail"><i class="material-icons">label</i> Tipe: ${i.category}</div>
+      </div>
+    `;
+        }).join('');
+      }
 
     function filterCategory(cat, btn) {
       currentFilter = cat;
